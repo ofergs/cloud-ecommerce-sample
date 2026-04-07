@@ -8,12 +8,13 @@ terraform {
     }
   }
 
-  # Uncomment to use S3 remote state:
-  # backend "s3" {
-  #   bucket = "your-tfstate-bucket"
-  #   key    = "cloud-ecommerce/frontend/terraform.tfstate"
-  #   region = "eu-west-1"
-  # }
+  backend "s3" {
+    bucket       = "cloud-ecommerce-sample-tfstate"
+    key          = "cloud-ecommerce/frontend/terraform.tfstate"
+    region       = "eu-west-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
