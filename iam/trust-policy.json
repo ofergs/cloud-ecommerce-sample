@@ -13,7 +13,7 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:ofergs/cloud-ecommerce-sample:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub": "repo:ofergs/cloud-ecommerce-sample:*"
         }
       }
     }
