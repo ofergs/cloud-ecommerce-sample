@@ -1,4 +1,4 @@
-import { APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,8 +35,9 @@ export function serverError(err: unknown): APIGatewayProxyResult {
   };
 }
 
-export function getUserId(event: { requestContext?: { authorizer?: { claims?: { sub?: string } } } }): string {
-  const sub = event.requestContext?.authorizer?.claims?.sub;
+export function getUserId(event: APIGatewayProxyEvent): string {
+  const claims = event.requestContext.authorizer?.claims as { sub?: string } | undefined;
+  const sub = claims?.sub;
   if (!sub) throw new Error('Unauthorized: missing user sub');
   return sub;
 }
