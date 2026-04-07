@@ -6,6 +6,10 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/deploy-backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
     inputs:
       stage:
@@ -17,9 +21,36 @@ concurrency:
   group: backend-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
+  verify:
+    name: Build and typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
   deploy:
     name: Serverless deploy
+    needs: verify
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.stage || 'dev' }}
 
@@ -39,11 +70,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: eu-west-1
 
       - name: Serverless deploy

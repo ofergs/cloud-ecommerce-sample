@@ -6,22 +6,27 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/deploy-frontend.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
   workflow_dispatch:
 
 concurrency:
   group: frontend-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  deploy:
-    name: Build and deploy to S3 + CloudFront
-    runs-on: ubuntu-latest
-    environment: dev
+permissions:
+  id-token: write
+  contents: read
 
+jobs:
+  verify:
+    name: Build and typecheck
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
-
     steps:
       - uses: actions/checkout@v4
 
@@ -34,18 +39,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Typecheck and build
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
           VITE_COGNITO_USER_POOL_ID: ${{ vars.VITE_COGNITO_USER_POOL_ID }}
           VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
         run: npm run build
 
-      - name: Configure AWS credentials
+      - name: Upload build artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+
+  deploy:
+    name: Deploy to S3 + CloudFront
+    needs: verify
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: eu-west-1
 
       - name: Sync to S3
