@@ -1,0 +1,266 @@
+service: cloud-ecommerce
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: eu-west-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    TABLE_NAME: !Ref EcommerceTable
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:TransactWriteItems
+          Resource:
+            - !GetAtt EcommerceTable.Arn
+            - !Sub '${EcommerceTable.Arn}/index/*'
+
+custom:
+  serverless-offline:
+    httpPort: 3001
+
+functions:
+  # ── Products ──────────────────────────────────────────────────────────────
+  listProducts:
+    handler: src/handlers/products.listProducts
+    events:
+      - http:
+          path: /products
+          method: GET
+          cors: true
+
+  getProduct:
+    handler: src/handlers/products.getProduct
+    events:
+      - http:
+          path: /products/{id}
+          method: GET
+          cors: true
+
+  createProduct:
+    handler: src/handlers/products.createProduct
+    events:
+      - http:
+          path: /products
+          method: POST
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  updateProduct:
+    handler: src/handlers/products.updateProduct
+    events:
+      - http:
+          path: /products/{id}
+          method: PUT
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  deleteProduct:
+    handler: src/handlers/products.deleteProduct
+    events:
+      - http:
+          path: /products/{id}
+          method: DELETE
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  # ── Cart ──────────────────────────────────────────────────────────────────
+  getCart:
+    handler: src/handlers/cart.getCart
+    events:
+      - http:
+          path: /cart
+          method: GET
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  addCartItem:
+    handler: src/handlers/cart.addCartItem
+    events:
+      - http:
+          path: /cart/items
+          method: POST
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  updateCartItem:
+    handler: src/handlers/cart.updateCartItem
+    events:
+      - http:
+          path: /cart/items/{productId}
+          method: PUT
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  removeCartItem:
+    handler: src/handlers/cart.removeCartItem
+    events:
+      - http:
+          path: /cart/items/{productId}
+          method: DELETE
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  # ── Orders ────────────────────────────────────────────────────────────────
+  createOrder:
+    handler: src/handlers/orders.createOrder
+    events:
+      - http:
+          path: /orders
+          method: POST
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  listOrders:
+    handler: src/handlers/orders.listOrders
+    events:
+      - http:
+          path: /orders
+          method: GET
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  getOrder:
+    handler: src/handlers/orders.getOrder
+    events:
+      - http:
+          path: /orders/{id}
+          method: GET
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+resources:
+  Resources:
+    # ── DynamoDB ──────────────────────────────────────────────────────────
+    EcommerceTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: EcommerceTable-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: entityType
+            AttributeType: S
+          - AttributeName: gsi1pk
+            AttributeType: S
+          - AttributeName: gsi1sk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: EntityTypeIndex
+            KeySchema:
+              - AttributeName: entityType
+                KeyType: HASH
+              - AttributeName: sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: UserOrdersIndex
+            KeySchema:
+              - AttributeName: gsi1pk
+                KeyType: HASH
+              - AttributeName: gsi1sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    # ── Cognito ───────────────────────────────────────────────────────────
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: EcommerceUserPool-${self:provider.stage}
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireUppercase: true
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: false
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: EcommerceWebClient-${self:provider.stage}
+        UserPoolId: !Ref CognitoUserPool
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        GenerateSecret: false
+        PreventUserExistenceErrors: ENABLED
+
+    # ── API Gateway Cognito Authorizer ────────────────────────────────────
+    ApiGatewayAuthorizer:
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: CognitoAuthorizer
+        RestApiId: !Ref ApiGatewayRestApi
+        Type: COGNITO_USER_POOLS
+        IdentitySource: method.request.header.Authorization
+        ProviderARNs:
+          - !GetAtt CognitoUserPool.Arn
+
+  Outputs:
+    ApiUrl:
+      Value: !Sub 'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
+      Export:
+        Name: EcommerceApiUrl-${self:provider.stage}
+
+    UserPoolId:
+      Value: !Ref CognitoUserPool
+      Export:
+        Name: EcommerceUserPoolId-${self:provider.stage}
+
+    UserPoolClientId:
+      Value: !Ref CognitoUserPoolClient
+      Export:
+        Name: EcommerceUserPoolClientId-${self:provider.stage}
+
+    TableName:
+      Value: !Ref EcommerceTable
+      Export:
+        Name: EcommerceTableName-${self:provider.stage}
