@@ -2,7 +2,7 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "CloudFormation",
+      "Sid": "CloudFormationStack",
       "Effect": "Allow",
       "Action": [
         "cloudformation:CreateStack",
@@ -14,16 +14,23 @@
         "cloudformation:DescribeStackResources",
         "cloudformation:GetTemplate",
         "cloudformation:ListStackResources",
-        "cloudformation:ValidateTemplate",
         "cloudformation:CreateChangeSet",
         "cloudformation:DescribeChangeSet",
         "cloudformation:ExecuteChangeSet",
-        "cloudformation:DeleteChangeSet",
-        "cloudformation:ListStacks"
+        "cloudformation:DeleteChangeSet"
       ],
       "Resource": [
         "arn:aws:cloudformation:*:*:stack/cloud-ecommerce-*/*"
       ]
+    },
+    {
+      "Sid": "CloudFormationGlobal",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:ValidateTemplate",
+        "cloudformation:ListStacks"
+      ],
+      "Resource": "*"
     },
     {
       "Sid": "ServerlessDeploymentBucket",

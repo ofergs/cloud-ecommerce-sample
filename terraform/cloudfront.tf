@@ -34,7 +34,7 @@ resource "aws_cloudfront_distribution" "frontend" {
 
     # Long cache for hashed assets (Vite adds content hashes to filenames)
     min_ttl     = 0
-    default_ttl = 86400   # 1 day
+    default_ttl = 86400    # 1 day
     max_ttl     = 31536000 # 1 year
   }
 
