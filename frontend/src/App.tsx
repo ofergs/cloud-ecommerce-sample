@@ -10,9 +10,9 @@ import OrdersPage from './pages/OrdersPage';
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-100 font-sans">
         <Navbar />
-        <main className="max-w-5xl mx-auto px-4 py-8">
+        <main className="max-w-screen-2xl mx-auto px-4 py-6">
           <Routes>
             <Route path="/" element={<Navigate to="/products" replace />} />
             <Route path="/login" element={<LoginPage />} />
